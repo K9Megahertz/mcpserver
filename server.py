@@ -1,4 +1,5 @@
 from fastmcp import FastMCP
+import os
 
 
 PORT = os.environ.get("PORT", 10000)
