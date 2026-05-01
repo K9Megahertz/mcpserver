@@ -5,6 +5,9 @@ mcp = FastMCP("SimpleMathServer")
 
 @mcp.tool()
 def add(a: float, b: float) -> float:
+    """
+    Use this tool to add two numbers together
+    """
     return a + b
 
 if __name__ == "__main__":
