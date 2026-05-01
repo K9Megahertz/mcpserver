@@ -1,7 +1,10 @@
 from fastmcp import FastMCP
 
+
+PORT = os.environ.get("PORT", 10000)
+
 # Create MCP server
-mcp = FastMCP("SimpleMathServer")
+mcp = FastMCP("SimpleMathServer", host="0.0.0.0", port=PORT)
 
 # Define a tool
 @mcp.tool()
