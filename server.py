@@ -9,4 +9,4 @@ def add(a: float, b: float) -> float:
 
 if __name__ == "__main__":
     PORT = int(os.environ.get("PORT", 10000))
-    mcp.run_http(host="0.0.0.0", port=PORT)
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=PORT)
