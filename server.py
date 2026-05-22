@@ -8,6 +8,21 @@ JWT_ISSUER = os.environ["JWT_ISSUER"]
 JWT_AUDIENCE = os.environ.get("JWT_AUDIENCE", "mcp-server")
 MCP_BASE_URL = os.environ["MCP_BASE_URL"]
 
+class MyRemoteAuthProvider(RemoteAuthProvider):
+    def get_routes(self):
+        routes = super().get_routes()
+
+        async def authorize_redirect(request):
+            query = request.url.query
+            return RedirectResponse(
+                url=f"{JWT_ISSUER}/authorize?{query}",
+                status_code=302,
+            )
+
+        routes.append(Route("/authorize", authorize_redirect, methods=["GET"]))
+        return routes
+
+
 token_verifier = JWTVerifier(
     public_key=JWT_SECRET,
     issuer=JWT_ISSUER,
