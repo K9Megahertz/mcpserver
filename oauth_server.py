@@ -23,8 +23,8 @@ CLIENTS["vscode-mcp"] = {
     "client_id": "vscode-mcp",
     "client_name": "VS Code MCP",
     "redirect_uris": [
-        "http://127.0.0.1/callback",
-        "http://localhost/callback"
+        "http://127.0.0.1/redirect",
+        "http://localhost/redirect"
     ],
     "grant_types": ["authorization_code"],
     "response_types": ["code"],
