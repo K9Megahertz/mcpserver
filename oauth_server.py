@@ -13,22 +13,21 @@ from pydantic import BaseModel, Field
 
 app = FastAPI()
 
-ISSUER = os.environ.get("ISSUER", "https://your-oauth-server.onrender.com")
+ISSUER = os.environ.get("ISSUER", "https://oauthserver-nm5l.onrender.com").rstrip("/")
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-change-me")
 USERS_FILE = os.environ.get("USERS_FILE", "users.json")
 
 AUTH_CODES = {}
-CLIENTS = {}
-CLIENTS["vscode-mcp"] = {
-    "client_id": "vscode-mcp",
-    "client_name": "VS Code MCP",
-    "redirect_uris": [
-        "http://127.0.0.1/redirect",
-        "http://localhost/redirect"
-    ],
-    "grant_types": ["authorization_code"],
-    "response_types": ["code"],
-    "token_endpoint_auth_method": "none",
+
+CLIENTS = {
+    "vscode-mcp": {
+        "client_id": "vscode-mcp",
+        "client_name": "VS Code MCP",
+        "redirect_uris": ["http://127.0.0.1", "http://localhost", "vscode://"],
+        "grant_types": ["authorization_code"],
+        "response_types": ["code"],
+        "token_endpoint_auth_method": "none",
+    }
 }
 
 
@@ -56,6 +55,15 @@ def verify_user(username: str, password: str) -> bool:
     return False
 
 
+def is_allowed_redirect_uri(client_id: str, redirect_uri: str) -> bool:
+    if client_id not in CLIENTS:
+        return False
+
+    allowed_prefixes = CLIENTS[client_id]["redirect_uris"]
+
+    return any(redirect_uri.startswith(prefix) for prefix in allowed_prefixes)
+
+
 def pkce_s256(verifier: str) -> str:
     digest = hashlib.sha256(verifier.encode()).digest()
     return base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
@@ -78,6 +86,16 @@ def oauth_metadata():
         "code_challenge_methods_supported": ["S256", "plain"],
         "token_endpoint_auth_methods_supported": ["none"],
     }
+
+
+@app.get("/.well-known/oauth-authorization-server/mcp")
+def oauth_metadata_mcp():
+    return oauth_metadata()
+
+
+@app.get("/.well-known/openid-configuration")
+def openid_configuration():
+    return oauth_metadata()
 
 
 @app.post("/register")
@@ -123,7 +141,7 @@ def authorize_page(
     if client_id not in CLIENTS:
         raise HTTPException(status_code=400, detail="Unknown client_id")
 
-    if redirect_uri not in CLIENTS[client_id]["redirect_uris"]:
+    if not is_allowed_redirect_uri(client_id, redirect_uri):
         raise HTTPException(status_code=400, detail="Invalid redirect_uri")
 
     return f"""
@@ -152,6 +170,27 @@ def authorize_page(
     """
 
 
+@app.get("/authorize/mcp", response_class=HTMLResponse)
+def authorize_page_mcp(
+    response_type: str,
+    client_id: str,
+    redirect_uri: str,
+    state: Optional[str] = None,
+    scope: Optional[str] = None,
+    code_challenge: Optional[str] = None,
+    code_challenge_method: Optional[str] = "plain",
+):
+    return authorize_page(
+        response_type=response_type,
+        client_id=client_id,
+        redirect_uri=redirect_uri,
+        state=state,
+        scope=scope,
+        code_challenge=code_challenge,
+        code_challenge_method=code_challenge_method,
+    )
+
+
 @app.post("/authorize")
 def authorize_submit(
     client_id: str = Form(...),
@@ -166,7 +205,7 @@ def authorize_submit(
     if client_id not in CLIENTS:
         raise HTTPException(status_code=400, detail="Unknown client_id")
 
-    if redirect_uri not in CLIENTS[client_id]["redirect_uris"]:
+    if not is_allowed_redirect_uri(client_id, redirect_uri):
         raise HTTPException(status_code=400, detail="Invalid redirect_uri")
 
     if not verify_user(username, password):
@@ -192,6 +231,29 @@ def authorize_submit(
     return RedirectResponse(url, status_code=302)
 
 
+@app.post("/authorize/mcp")
+def authorize_submit_mcp(
+    client_id: str = Form(...),
+    redirect_uri: str = Form(...),
+    username: str = Form(...),
+    password: str = Form(...),
+    state: str = Form(""),
+    scope: str = Form(""),
+    code_challenge: str = Form(""),
+    code_challenge_method: str = Form("plain"),
+):
+    return authorize_submit(
+        client_id=client_id,
+        redirect_uri=redirect_uri,
+        username=username,
+        password=password,
+        state=state,
+        scope=scope,
+        code_challenge=code_challenge,
+        code_challenge_method=code_challenge_method,
+    )
+
+
 @app.post("/token")
 def token(
     grant_type: str = Form(...),
@@ -205,6 +267,9 @@ def token(
 
     if client_id not in CLIENTS:
         raise HTTPException(status_code=400, detail="Unknown client_id")
+
+    if not is_allowed_redirect_uri(client_id, redirect_uri):
+        raise HTTPException(status_code=400, detail="Invalid redirect_uri")
 
     data = AUTH_CODES.pop(code, None)
 
@@ -257,4 +322,21 @@ def token(
             "expires_in": 3600,
             "scope": data["scope"],
         }
+    )
+
+
+@app.post("/token/mcp")
+def token_mcp(
+    grant_type: str = Form(...),
+    code: str = Form(...),
+    redirect_uri: str = Form(...),
+    client_id: str = Form(...),
+    code_verifier: Optional[str] = Form(None),
+):
+    return token(
+        grant_type=grant_type,
+        code=code,
+        redirect_uri=redirect_uri,
+        client_id=client_id,
+        code_verifier=code_verifier,
     )
