@@ -1,30 +1,12 @@
 from fastmcp import FastMCP
 from fastmcp.server.auth import RemoteAuthProvider
 from fastmcp.server.auth.providers.jwt import JWTVerifier
-from starlette.responses import RedirectResponse
-from starlette.routing import Route
 import os
 
 JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ISSUER = os.environ["JWT_ISSUER"]
 JWT_AUDIENCE = os.environ.get("JWT_AUDIENCE", "mcp-server")
 MCP_BASE_URL = os.environ["MCP_BASE_URL"]
-
-
-class MyRemoteAuthProvider(RemoteAuthProvider):
-    def get_routes(self):
-        routes = super().get_routes()
-
-        async def authorize_redirect(request):
-            query = request.url.query
-            return RedirectResponse(
-                url=f"{JWT_ISSUER}/authorize?{query}",
-                status_code=302,
-            )
-
-        routes.append(Route("/authorize", authorize_redirect, methods=["GET"]))
-        return routes
-
 
 token_verifier = JWTVerifier(
     public_key=JWT_SECRET,
@@ -33,7 +15,7 @@ token_verifier = JWTVerifier(
     algorithm="HS256",
 )
 
-auth = MyRemoteAuthProvider(
+auth = RemoteAuthProvider(
     token_verifier=token_verifier,
     authorization_servers=[JWT_ISSUER],
     base_url=MCP_BASE_URL,
