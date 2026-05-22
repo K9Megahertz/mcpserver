@@ -19,6 +19,16 @@ USERS_FILE = os.environ.get("USERS_FILE", "users.json")
 
 AUTH_CODES = {}
 CLIENTS = {}
+CLIENTS["vscode-mcp"] = {
+    "client_id": "vscode-mcp",
+    "client_name": "VS Code MCP",
+    "redirect_uris": [
+        "http://127.0.0.1/callback",
+        "http://localhost/callback"
+    ],
+    "grant_types": ["authorization_code"],
+    "response_types": ["code"],
+    "token_endpoint_auth_method": "none",
 
 
 class ClientRegistrationRequest(BaseModel):
