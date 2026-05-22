@@ -4,12 +4,12 @@ import time
 import secrets
 import hashlib
 import base64
-from typing import Optional
+from typing import Optional, List
 
 import jwt
 from fastapi import FastAPI, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 app = FastAPI()
 
@@ -17,8 +17,17 @@ ISSUER = os.environ.get("ISSUER", "https://your-oauth-server.onrender.com")
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-change-me")
 USERS_FILE = os.environ.get("USERS_FILE", "users.json")
 
-# auth_code -> data
 AUTH_CODES = {}
+CLIENTS = {}
+
+
+class ClientRegistrationRequest(BaseModel):
+    redirect_uris: List[str]
+    client_name: Optional[str] = "Dynamic MCP Client"
+    grant_types: Optional[List[str]] = Field(default_factory=lambda: ["authorization_code"])
+    response_types: Optional[List[str]] = Field(default_factory=lambda: ["code"])
+    token_endpoint_auth_method: Optional[str] = "none"
+    scope: Optional[str] = ""
 
 
 def load_users():
@@ -28,9 +37,11 @@ def load_users():
 
 def verify_user(username: str, password: str) -> bool:
     users = load_users()
+
     for user in users:
         if user["username"] == username and user["password"] == password:
             return True
+
     return False
 
 
@@ -39,16 +50,49 @@ def pkce_s256(verifier: str) -> str:
     return base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
 
 
+@app.get("/")
+def root():
+    return {"status": "oauth server running"}
+
+
 @app.get("/.well-known/oauth-authorization-server")
 def oauth_metadata():
     return {
         "issuer": ISSUER,
         "authorization_endpoint": f"{ISSUER}/authorize",
         "token_endpoint": f"{ISSUER}/token",
+        "registration_endpoint": f"{ISSUER}/register",
         "response_types_supported": ["code"],
         "grant_types_supported": ["authorization_code"],
         "code_challenge_methods_supported": ["S256", "plain"],
         "token_endpoint_auth_methods_supported": ["none"],
+    }
+
+
+@app.post("/register")
+def register_client(req: ClientRegistrationRequest):
+    client_id = "client_" + secrets.token_urlsafe(24)
+
+    CLIENTS[client_id] = {
+        "client_id": client_id,
+        "client_name": req.client_name,
+        "redirect_uris": req.redirect_uris,
+        "grant_types": req.grant_types,
+        "response_types": req.response_types,
+        "token_endpoint_auth_method": req.token_endpoint_auth_method,
+        "scope": req.scope,
+        "created_at": int(time.time()),
+    }
+
+    return {
+        "client_id": client_id,
+        "client_name": req.client_name,
+        "redirect_uris": req.redirect_uris,
+        "grant_types": req.grant_types,
+        "response_types": req.response_types,
+        "token_endpoint_auth_method": req.token_endpoint_auth_method,
+        "scope": req.scope,
+        "client_id_issued_at": int(time.time()),
     }
 
 
@@ -64,6 +108,12 @@ def authorize_page(
 ):
     if response_type != "code":
         raise HTTPException(status_code=400, detail="Only response_type=code is supported")
+
+    if client_id not in CLIENTS:
+        raise HTTPException(status_code=400, detail="Unknown client_id")
+
+    if redirect_uri not in CLIENTS[client_id]["redirect_uris"]:
+        raise HTTPException(status_code=400, detail="Invalid redirect_uri")
 
     return f"""
     <html>
@@ -102,6 +152,12 @@ def authorize_submit(
     code_challenge: str = Form(""),
     code_challenge_method: str = Form("plain"),
 ):
+    if client_id not in CLIENTS:
+        raise HTTPException(status_code=400, detail="Unknown client_id")
+
+    if redirect_uri not in CLIENTS[client_id]["redirect_uris"]:
+        raise HTTPException(status_code=400, detail="Invalid redirect_uri")
+
     if not verify_user(username, password):
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
@@ -118,6 +174,7 @@ def authorize_submit(
     }
 
     url = f"{redirect_uri}?code={code}"
+
     if state:
         url += f"&state={state}"
 
@@ -135,7 +192,11 @@ def token(
     if grant_type != "authorization_code":
         raise HTTPException(status_code=400, detail="Only authorization_code is supported")
 
+    if client_id not in CLIENTS:
+        raise HTTPException(status_code=400, detail="Unknown client_id")
+
     data = AUTH_CODES.pop(code, None)
+
     if not data:
         raise HTTPException(status_code=400, detail="Invalid code")
 
@@ -186,8 +247,3 @@ def token(
             "scope": data["scope"],
         }
     )
-
-
-@app.get("/")
-def root():
-    return {"status": "oauth server running"}
