@@ -5,6 +5,7 @@ import secrets
 import hashlib
 import base64
 from typing import Optional, List
+from urllib.parse import urlencode
 
 import jwt
 from fastapi import FastAPI, Form, HTTPException
@@ -293,9 +294,15 @@ def authorize_submit(
         "expires_at": time.time() + 300,
     }
 
-    url = f"{redirect_uri}?code={code}"
+    params = {
+        "code": code,
+    }
+
     if state:
-        url += f"&state={state}"
+        params["state"] = state
+
+    separator = "&" if "?" in redirect_uri else "?"
+    url = redirect_uri + separator + urlencode(params)
 
     return RedirectResponse(url, status_code=302)
 
