@@ -1,7 +1,5 @@
 import os
 import httpx
-import base64
-import jwt as pyjwt
 from fastmcp import FastMCP
 from fastmcp.server.auth import RemoteAuthProvider
 from fastmcp.server.auth.providers.jwt import JWTVerifier
@@ -13,9 +11,8 @@ JWT_ISSUER = os.environ["JWT_ISSUER"].rstrip("/")
 JWT_AUDIENCE = os.environ.get("JWT_AUDIENCE", "mcp-server")
 MCP_BASE_URL = os.environ["MCP_BASE_URL"].rstrip("/")
 
-# authlib sometimes expects the HMAC secret as bytes
 token_verifier = JWTVerifier(
-    public_key=JWT_SECRET.encode("utf-8"),
+    public_key=JWT_SECRET,
     issuer=JWT_ISSUER,
     audience=JWT_AUDIENCE,
     algorithm="HS256",
@@ -67,53 +64,6 @@ async def token_proxy(request: Request):
         resp = await client.post(f"{JWT_ISSUER}/token", content=body, headers=headers)
     return JSONResponse(resp.json(), status_code=resp.status_code)
 
-@mcp.custom_route("/debug-token", methods=["GET"])
-async def debug_token(request: Request):
-    auth_header = request.headers.get("authorization", "")
-
-    if not auth_header.startswith("Bearer "):
-        return JSONResponse({
-            "ok": False,
-            "error": "missing bearer token",
-        }, status_code=401)
-
-    token = auth_header.removeprefix("Bearer ").strip()
-
-  
-
-    try:
-        payload = pyjwt.decode(
-            token,
-            JWT_SECRET,
-            algorithms=["HS256"],
-            audience=JWT_AUDIENCE,
-            issuer=JWT_ISSUER,
-        )
-
-        return JSONResponse({
-            "ok": True,
-            "payload": payload,
-            "mcp_server_expects_audience": JWT_AUDIENCE,
-            "mcp_server_expects_issuer": JWT_ISSUER,
-        })
-
-    except Exception as e:
-        try:
-            unverified = pyjwt.decode(
-                token,
-                options={"verify_signature": False}
-            )
-        except Exception:
-            unverified = None
-
-        return JSONResponse({
-            "ok": False,
-            "error_type": type(e).__name__,
-            "error": str(e),
-            "unverified": unverified,
-            "mcp_server_expects_audience": JWT_AUDIENCE,
-            "mcp_server_expects_issuer": JWT_ISSUER,
-        }, status_code=401)
 
 @mcp.tool()
 def add(a: float, b: float) -> float:
