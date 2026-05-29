@@ -37,7 +37,7 @@ async def oauth_metadata(request: Request):
         "issuer": JWT_ISSUER,
         "authorization_endpoint": f"{JWT_ISSUER}/authorize",
         "token_endpoint": f"{JWT_ISSUER}/token",
-        "registration_endpoint": f"{JWT_ISSUER}/register",
+        #"registration_endpoint": f"{JWT_ISSUER}/register",
         "response_types_supported": ["code"],
         "grant_types_supported": ["authorization_code"],
         "code_challenge_methods_supported": ["S256", "plain"],
