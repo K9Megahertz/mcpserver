@@ -11,7 +11,17 @@ from fastapi import FastAPI, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from pydantic import BaseModel, Field
 
+
 app = FastAPI()
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    print("REQUEST:", request.method, str(request.url), flush=True)
+    response = await call_next(request)
+    print("RESPONSE:", response.status_code, flush=True)
+    return response
+
+
 
 ISSUER = os.environ.get("ISSUER", "https://oauthserver-nm5l.onrender.com").rstrip("/")
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-change-me")
