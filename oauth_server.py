@@ -114,7 +114,7 @@ def oauth_metadata():
         "issuer": ISSUER,
         "authorization_endpoint": f"{ISSUER}/authorize",
         "token_endpoint": f"{ISSUER}/token",
-        "registration_endpoint": f"{ISSUER}/register",
+        #"registration_endpoint": f"{ISSUER}/register",
         "response_types_supported": ["code"],
         "grant_types_supported": ["authorization_code"],
         "code_challenge_methods_supported": ["S256", "plain"],
