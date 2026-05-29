@@ -45,6 +45,18 @@ async def token_redirect(request: Request):
         status_code=307,
     )
 
+@mcp.custom_route("/.well-known/oauth-authorization-server", methods=["GET"])
+async def oauth_metadata(request: Request):
+    return JSONResponse({
+        "issuer": OAUTH_SERVER,
+        "authorization_endpoint": f"{OAUTH_SERVER}/authorize",
+        "token_endpoint": f"{OAUTH_SERVER}/token",
+        "registration_endpoint": f"{OAUTH_SERVER}/register",
+        "response_types_supported": ["code"],
+        "grant_types_supported": ["authorization_code"],
+        "code_challenge_methods_supported": ["S256", "plain"],
+        "token_endpoint_auth_methods_supported": ["none"],
+    })
 
 @mcp.tool()
 def add(a: float, b: float) -> float:
