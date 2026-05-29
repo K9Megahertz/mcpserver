@@ -28,7 +28,15 @@ STATIC_CLIENTS = {
         "grant_types": ["authorization_code"],
         "response_types": ["code"],
         "token_endpoint_auth_method": "none",
-    }
+    },
+    "mcp-server": {
+        "client_id": "mcp-server",
+        "client_name": "FastMCP",
+        "redirect_uris": ["http://127.0.0.1", "http://localhost", "vscode://"],
+        "grant_types": ["authorization_code"],
+        "response_types": ["code"],
+        "token_endpoint_auth_method": "none",
+    },
 }
 
 
