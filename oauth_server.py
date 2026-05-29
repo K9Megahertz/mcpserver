@@ -14,6 +14,26 @@ from pydantic import BaseModel, Field
 
 app = FastAPI()
 
+def ensure_client_exists(client_id: str):
+    if client_id in CLIENTS:
+        return
+
+    if client_id.startswith("client_"):
+        print("Recovering cached VS Code dynamic client:", client_id, flush=True)
+
+        CLIENTS[client_id] = {
+            "client_id": client_id,
+            "client_name": "Recovered VS Code Client",
+            "redirect_uris": ["http://127.0.0.1", "http://localhost", "vscode://"],
+            "grant_types": ["authorization_code"],
+            "response_types": ["code"],
+            "token_endpoint_auth_method": "none",
+            "scope": "",
+        }
+        return
+
+    raise HTTPException(status_code=400, detail=f"Unknown client_id: {client_id}")
+
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     print("REQUEST:", request.method, str(request.url), flush=True)
@@ -187,8 +207,9 @@ def authorize_page(
     if response_type != "code":
         raise HTTPException(status_code=400, detail="Only response_type=code is supported")
 
-    if client_id not in CLIENTS:
-        raise HTTPException(status_code=400, detail="Unknown client_id")
+    ensure_client_exists(client_id)
+    #if client_id not in CLIENTS:
+    #    raise HTTPException(status_code=400, detail="Unknown client_id")
 
     if not is_allowed_redirect_uri(client_id, redirect_uri):
         raise HTTPException(status_code=400, detail="Invalid redirect_uri")
@@ -250,8 +271,9 @@ def authorize_submit(
     code_challenge: str = Form(""),
     code_challenge_method: str = Form("plain"),
 ):
-    if client_id not in CLIENTS:
-        raise HTTPException(status_code=400, detail="Unknown client_id")
+    ensure_client_exists(client_id)
+    #if client_id not in CLIENTS:
+    #    raise HTTPException(status_code=400, detail="Unknown client_id")
 
     if not is_allowed_redirect_uri(client_id, redirect_uri):
         raise HTTPException(status_code=400, detail="Invalid redirect_uri")
@@ -311,9 +333,9 @@ def token(
 ):
     if grant_type != "authorization_code":
         raise HTTPException(status_code=400, detail="Only authorization_code is supported")
-
-    if client_id not in CLIENTS:
-        raise HTTPException(status_code=400, detail="Unknown client_id")
+    ensure_client_exists(client_id)
+    #if client_id not in CLIENTS:
+    #    raise HTTPException(status_code=400, detail="Unknown client_id")
 
     if not is_allowed_redirect_uri(client_id, redirect_uri):
         raise HTTPException(status_code=400, detail="Invalid redirect_uri")
