@@ -81,6 +81,37 @@ async def debug_token(request: Request):
         "mcp_server_expects_issuer": JWT_ISSUER,
     })
 
+@app.get("/debug-token")
+async def debug_token(request):
+    auth = request.headers.get("authorization", "")
+
+    if not auth.startswith("Bearer "):
+        return {"ok": False, "error": "missing bearer token"}
+
+    token = auth.removeprefix("Bearer ").strip()
+
+    try:
+        payload = jwt.decode(
+            token,
+            JWT_SECRET,
+            algorithms=["HS256"],
+            audience=JWT_AUDIENCE,
+            issuer=JWT_ISSUER,
+        )
+
+        return {
+            "ok": True,
+            "payload": payload,
+        }
+
+    except Exception as e:
+        return {
+            "ok": False,
+            "error_type": type(e).__name__,
+            "error": str(e),
+            "unverified": jwt.decode(token, options={"verify_signature": False}),
+        }
+
 @mcp.tool()
 def add(a: float, b: float) -> float:
     """Use this tool to add two numbers together."""

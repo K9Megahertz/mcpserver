@@ -283,6 +283,14 @@ def authorize_submit_mcp(
     )
 
 
+@app.get("/debug-config")
+def debug_config():
+    return {
+        "issuer": ISSUER,
+        "jwt_secret_set": bool(JWT_SECRET),
+        "jwt_secret_length": len(JWT_SECRET),
+    }
+
 @app.post("/token")
 def token(
     grant_type: str = Form(...),
