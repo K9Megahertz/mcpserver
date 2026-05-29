@@ -66,6 +66,20 @@ async def token_proxy(request: Request):
         resp = await client.post(f"{JWT_ISSUER}/token", content=body, headers=headers)
     return JSONResponse(resp.json(), status_code=resp.status_code)
 
+@mcp.custom_route("/debug-token", methods=["GET"])
+async def debug_token(request: Request):
+    auth = request.headers.get("Authorization", "")
+    token = auth.replace("Bearer ", "")
+    if not token:
+        return JSONResponse({"error": "no token"})
+    import jwt as pyjwt
+    # Decode WITHOUT verification just to see the claims
+    decoded = pyjwt.decode(token, options={"verify_signature": False})
+    return JSONResponse({
+        "claims": decoded,
+        "mcp_server_expects_audience": JWT_AUDIENCE,
+        "mcp_server_expects_issuer": JWT_ISSUER,
+    })
 
 @mcp.tool()
 def add(a: float, b: float) -> float:
