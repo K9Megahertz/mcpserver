@@ -1,9 +1,10 @@
+import os
+import httpx
 from fastmcp import FastMCP
 from fastmcp.server.auth import RemoteAuthProvider
 from fastmcp.server.auth.providers.jwt import JWTVerifier
 from starlette.requests import Request
-from starlette.responses import RedirectResponse
-import os
+from starlette.responses import JSONResponse, RedirectResponse
 
 JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ISSUER = os.environ["JWT_ISSUER"].rstrip("/")
@@ -29,8 +30,24 @@ mcp = FastMCP(
 )
 
 
+@mcp.custom_route("/.well-known/oauth-authorization-server", methods=["GET"])
+async def oauth_metadata(request: Request):
+    """Point VS Code directly at the OAuth server — no redirects needed."""
+    return JSONResponse({
+        "issuer": JWT_ISSUER,
+        "authorization_endpoint": f"{JWT_ISSUER}/authorize",
+        "token_endpoint": f"{JWT_ISSUER}/token",
+        "registration_endpoint": f"{JWT_ISSUER}/register",
+        "response_types_supported": ["code"],
+        "grant_types_supported": ["authorization_code"],
+        "code_challenge_methods_supported": ["S256", "plain"],
+        "token_endpoint_auth_methods_supported": ["none"],
+    })
+
+
 @mcp.custom_route("/authorize", methods=["GET"])
 async def authorize_redirect(request: Request):
+    """Fallback redirect in case something hits /authorize on the MCP server."""
     query = request.url.query
     return RedirectResponse(
         url=f"{JWT_ISSUER}/authorize?{query}",
@@ -39,30 +56,18 @@ async def authorize_redirect(request: Request):
 
 
 @mcp.custom_route("/token", methods=["POST"])
-async def token_redirect(request: Request):
-    return RedirectResponse(
-        url=f"{JWT_ISSUER}/token",
-        status_code=307,
-    )
+async def token_proxy(request: Request):
+    """Proxy token requests instead of redirecting (clients don't follow POST redirects)."""
+    body = await request.body()
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(f"{JWT_ISSUER}/token", content=body, headers=headers)
+    return JSONResponse(resp.json(), status_code=resp.status_code)
 
-@mcp.custom_route("/.well-known/oauth-authorization-server", methods=["GET"])
-async def oauth_metadata(request: Request):
-    return JSONResponse({
-        "issuer": OAUTH_SERVER,
-        "authorization_endpoint": f"{OAUTH_SERVER}/authorize",
-        "token_endpoint": f"{OAUTH_SERVER}/token",
-        "registration_endpoint": f"{OAUTH_SERVER}/register",
-        "response_types_supported": ["code"],
-        "grant_types_supported": ["authorization_code"],
-        "code_challenge_methods_supported": ["S256", "plain"],
-        "token_endpoint_auth_methods_supported": ["none"],
-    })
 
 @mcp.tool()
 def add(a: float, b: float) -> float:
-    """
-    Use this tool to add two numbers together.
-    """
+    """Use this tool to add two numbers together."""
     return a + b
 
 

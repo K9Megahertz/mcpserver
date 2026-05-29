@@ -16,10 +16,11 @@ app = FastAPI()
 ISSUER = os.environ.get("ISSUER", "https://oauthserver-nm5l.onrender.com").rstrip("/")
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-change-me")
 USERS_FILE = os.environ.get("USERS_FILE", "users.json")
+CLIENTS_FILE = os.environ.get("CLIENTS_FILE", "clients.json")
 
 AUTH_CODES = {}
 
-CLIENTS = {
+STATIC_CLIENTS = {
     "vscode-mcp": {
         "client_id": "vscode-mcp",
         "client_name": "VS Code MCP",
@@ -29,6 +30,25 @@ CLIENTS = {
         "token_endpoint_auth_method": "none",
     }
 }
+
+
+def load_dynamic_clients() -> dict:
+    if not os.path.exists(CLIENTS_FILE):
+        return {}
+    try:
+        with open(CLIENTS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_dynamic_clients(clients: dict):
+    with open(CLIENTS_FILE, "w", encoding="utf-8") as f:
+        json.dump(clients, f, indent=2)
+
+
+# In-memory clients: static + dynamic loaded from disk
+CLIENTS = {**STATIC_CLIENTS, **load_dynamic_clients()}
 
 
 class ClientRegistrationRequest(BaseModel):
@@ -47,20 +67,16 @@ def load_users():
 
 def verify_user(username: str, password: str) -> bool:
     users = load_users()
-
     for user in users:
         if user["username"] == username and user["password"] == password:
             return True
-
     return False
 
 
 def is_allowed_redirect_uri(client_id: str, redirect_uri: str) -> bool:
     if client_id not in CLIENTS:
         return False
-
     allowed_prefixes = CLIENTS[client_id]["redirect_uris"]
-
     return any(redirect_uri.startswith(prefix) for prefix in allowed_prefixes)
 
 
@@ -101,8 +117,9 @@ def openid_configuration():
 @app.post("/register")
 def register_client(req: ClientRegistrationRequest):
     client_id = "client_" + secrets.token_urlsafe(24)
+    print(f"[register] new client: {req.client_name} — {req.redirect_uris}")
 
-    CLIENTS[client_id] = {
+    entry = {
         "client_id": client_id,
         "client_name": req.client_name,
         "redirect_uris": req.redirect_uris,
@@ -112,6 +129,12 @@ def register_client(req: ClientRegistrationRequest):
         "scope": req.scope,
         "created_at": int(time.time()),
     }
+
+    CLIENTS[client_id] = entry
+
+    # Persist only dynamic clients (exclude static ones)
+    dynamic = {k: v for k, v in CLIENTS.items() if k not in STATIC_CLIENTS}
+    save_dynamic_clients(dynamic)
 
     return {
         "client_id": client_id,
@@ -148,7 +171,6 @@ def authorize_page(
     <html>
       <body>
         <h2>Test OAuth Login</h2>
-
         <form method="post" action="/authorize">
           <input type="hidden" name="client_id" value="{client_id}">
           <input type="hidden" name="redirect_uri" value="{redirect_uri}">
@@ -224,7 +246,6 @@ def authorize_submit(
     }
 
     url = f"{redirect_uri}?code={code}"
-
     if state:
         url += f"&state={state}"
 
