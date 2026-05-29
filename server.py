@@ -1,6 +1,7 @@
 import os
 import httpx
 import base64
+import jwt as pyjwt
 from fastmcp import FastMCP
 from fastmcp.server.auth import RemoteAuthProvider
 from fastmcp.server.auth.providers.jwt import JWTVerifier
@@ -68,30 +69,20 @@ async def token_proxy(request: Request):
 
 @mcp.custom_route("/debug-token", methods=["GET"])
 async def debug_token(request: Request):
-    auth = request.headers.get("Authorization", "")
-    token = auth.replace("Bearer ", "")
-    if not token:
-        return JSONResponse({"error": "no token"})
-    import jwt as pyjwt
-    # Decode WITHOUT verification just to see the claims
-    decoded = pyjwt.decode(token, options={"verify_signature": False})
-    return JSONResponse({
-        "claims": decoded,
-        "mcp_server_expects_audience": JWT_AUDIENCE,
-        "mcp_server_expects_issuer": JWT_ISSUER,
-    })
+    auth_header = request.headers.get("authorization", "")
 
-@app.get("/debug-token")
-async def debug_token(request):
-    auth = request.headers.get("authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return JSONResponse({
+            "ok": False,
+            "error": "missing bearer token",
+        }, status_code=401)
 
-    if not auth.startswith("Bearer "):
-        return {"ok": False, "error": "missing bearer token"}
+    token = auth_header.removeprefix("Bearer ").strip()
 
-    token = auth.removeprefix("Bearer ").strip()
+  
 
     try:
-        payload = jwt.decode(
+        payload = pyjwt.decode(
             token,
             JWT_SECRET,
             algorithms=["HS256"],
@@ -99,18 +90,30 @@ async def debug_token(request):
             issuer=JWT_ISSUER,
         )
 
-        return {
+        return JSONResponse({
             "ok": True,
             "payload": payload,
-        }
+            "mcp_server_expects_audience": JWT_AUDIENCE,
+            "mcp_server_expects_issuer": JWT_ISSUER,
+        })
 
     except Exception as e:
-        return {
+        try:
+            unverified = pyjwt.decode(
+                token,
+                options={"verify_signature": False}
+            )
+        except Exception:
+            unverified = None
+
+        return JSONResponse({
             "ok": False,
             "error_type": type(e).__name__,
             "error": str(e),
-            "unverified": jwt.decode(token, options={"verify_signature": False}),
-        }
+            "unverified": unverified,
+            "mcp_server_expects_audience": JWT_AUDIENCE,
+            "mcp_server_expects_issuer": JWT_ISSUER,
+        }, status_code=401)
 
 @mcp.tool()
 def add(a: float, b: float) -> float:
