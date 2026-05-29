@@ -1,5 +1,6 @@
 import os
 import httpx
+import base64
 from fastmcp import FastMCP
 from fastmcp.server.auth import RemoteAuthProvider
 from fastmcp.server.auth.providers.jwt import JWTVerifier
@@ -11,8 +12,9 @@ JWT_ISSUER = os.environ["JWT_ISSUER"].rstrip("/")
 JWT_AUDIENCE = os.environ.get("JWT_AUDIENCE", "mcp-server")
 MCP_BASE_URL = os.environ["MCP_BASE_URL"].rstrip("/")
 
+# authlib sometimes expects the HMAC secret as bytes
 token_verifier = JWTVerifier(
-    public_key=JWT_SECRET,
+    public_key=JWT_SECRET.encode("utf-8"),
     issuer=JWT_ISSUER,
     audience=JWT_AUDIENCE,
     algorithm="HS256",
