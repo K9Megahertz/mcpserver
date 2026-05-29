@@ -166,6 +166,14 @@ def authorize_page(
     code_challenge: Optional[str] = None,
     code_challenge_method: Optional[str] = "plain",
 ):
+    print("AUTHORIZE CALLED", flush=True)
+    print("response_type =", response_type, flush=True)
+    print("client_id =", client_id, flush=True)
+    print("redirect_uri =", redirect_uri, flush=True)
+    print("state =", state, flush=True)
+    print("code_challenge =", code_challenge, flush=True)
+    print("code_challenge_method =", code_challenge_method, flush=True)
+    print("CLIENTS keys =", list(CLIENTS.keys()), flush=True)
     if response_type != "code":
         raise HTTPException(status_code=400, detail="Only response_type=code is supported")
 
