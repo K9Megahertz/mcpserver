@@ -391,6 +391,9 @@ def token(
         algorithm="HS256",
     )
 
+    print(f"[token] iss={ISSUER} aud=mcp-server secret_len={len(JWT_SECRET)}")  # ← add this
+    print(f"[token] issued: {access_token}")   
+
     return JSONResponse(
         {
             "access_token": access_token,

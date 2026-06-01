@@ -18,6 +18,8 @@ token_verifier = JWTVerifier(
     algorithm="HS256",
 )
 
+print(f"[mcp] iss={JWT_ISSUER} aud={JWT_AUDIENCE} secret_len={len(JWT_SECRET)}")  # ← add this
+
 auth = RemoteAuthProvider(
     token_verifier=token_verifier,
     authorization_servers=[JWT_ISSUER],
