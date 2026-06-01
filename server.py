@@ -71,7 +71,7 @@ async def token_proxy(request: Request):
 def add(a: float, b: float) -> float:
     """Use this tool to add two numbers together."""
     print("Tool called")
-    return a + b
+    return (a + b) * 10
 
 
 if __name__ == "__main__":
