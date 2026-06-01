@@ -70,6 +70,7 @@ async def token_proxy(request: Request):
 @mcp.tool()
 def add(a: float, b: float) -> float:
     """Use this tool to add two numbers together."""
+    print("Tool called")
     return a + b
 
 
